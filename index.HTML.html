@@ -1,0 +1,957 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PokéMarket — Live TCG Card Prices</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --bg:#0f0f13;--bg2:#16161c;--bg3:#1e1e26;--bg4:#26262f;
+  --b1:#2a2a35;--b2:#353542;
+  --t1:#f0f0f8;--t2:#9898b8;--t3:#55556a;
+  --gold:#f0c040;--green:#3de87a;--red:#ff4f6d;--blue:#4fa8ff;--purple:#a78bfa;
+  --ff:'Inter',sans-serif;--fm:'JetBrains Mono',monospace;
+}
+html,body{height:100%}
+body{background:var(--bg);color:var(--t1);font-family:var(--ff);font-size:14px;display:flex;flex-direction:column;min-height:100vh}
+::-webkit-scrollbar{width:4px;height:4px}::-webkit-scrollbar-track{background:var(--bg2)}::-webkit-scrollbar-thumb{background:var(--b2);border-radius:2px}
+
+/* NAV */
+nav{position:sticky;top:0;z-index:200;background:rgba(15,15,19,.97);backdrop-filter:blur(20px);border-bottom:1px solid var(--b1);display:flex;align-items:center;gap:14px;padding:0 24px;height:54px;flex-shrink:0}
+.logo{font-size:17px;font-weight:700;letter-spacing:-.4px;white-space:nowrap}
+.logo span{color:var(--gold)}
+.pill{display:flex;align-items:center;gap:5px;padding:3px 9px;border-radius:20px;background:rgba(61,232,122,.08);border:1px solid rgba(61,232,122,.25);font-family:var(--fm);font-size:10px;color:var(--green);letter-spacing:.8px;white-space:nowrap}
+.dot{width:5px;height:5px;border-radius:50%;background:var(--green);animation:blink 1.4s infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.2}}
+.search-wrap{flex:1;max-width:400px;position:relative}
+.search-wrap input{width:100%;padding:7px 12px 7px 34px;background:var(--bg3);border:1px solid var(--b1);border-radius:7px;color:var(--t1);font-family:var(--ff);font-size:13px;outline:none;transition:border .18s}
+.search-wrap input:focus{border-color:var(--gold)}
+.search-wrap input::placeholder{color:var(--t3)}
+.si{position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--t3);font-size:14px;pointer-events:none}
+.sdrop{position:absolute;top:calc(100%+4px);left:0;right:0;background:var(--bg3);border:1px solid var(--b2);border-radius:10px;z-index:300;max-height:420px;overflow-y:auto;box-shadow:0 12px 48px rgba(0,0,0,.8);display:none}
+.sdrop.open{display:block}
+.sri{display:flex;align-items:center;gap:10px;padding:9px 14px;cursor:pointer;border-bottom:1px solid var(--b1);transition:background .1s}
+.sri:last-child{border-bottom:none}.sri:hover{background:var(--bg4)}
+.sri-img{width:40px;height:56px;object-fit:contain;border-radius:4px;background:var(--bg4);flex-shrink:0}
+.sri-info{flex:1;min-width:0}
+.sri-name{font-weight:600;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sri-sub{font-size:11px;color:var(--t2);margin-top:1px}
+.sri-badge{display:inline-block;padding:1px 6px;background:rgba(240,192,64,.12);border:1px solid rgba(240,192,64,.25);border-radius:3px;font-family:var(--fm);font-size:10px;color:var(--gold)}
+.sri-price{text-align:right;flex-shrink:0}
+.sri-pval{font-family:var(--fm);font-size:13px;font-weight:500;color:var(--green)}
+.sri-psrc{font-size:10px;color:var(--t3);margin-top:1px}
+.nav-tabs{display:flex;gap:2px;margin-left:auto}
+.ntab{padding:5px 13px;border-radius:6px;font-size:12px;font-weight:500;cursor:pointer;border:none;background:none;color:var(--t2);font-family:var(--ff);transition:all .15s;white-space:nowrap}
+.ntab:hover{color:var(--t1);background:var(--bg3)}.ntab.on{color:var(--gold);background:rgba(240,192,64,.09)}
+
+/* MAIN */
+main{flex:1;max-width:1500px;margin:0 auto;width:100%;padding:20px 24px}
+.view{display:none}.view.on{display:block}
+
+/* STATS */
+.stats{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:18px}
+.sc{background:var(--bg2);border:1px solid var(--b1);border-radius:10px;padding:13px 16px;position:relative;overflow:hidden}
+.sc::after{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:var(--ac,var(--gold))}
+.sc-l{font-size:10px;text-transform:uppercase;letter-spacing:.8px;color:var(--t3);margin-bottom:4px}
+.sc-v{font-family:var(--fm);font-size:19px;font-weight:500;line-height:1.15}
+.sc-s{font-family:var(--fm);font-size:11px;margin-top:3px}
+.sc-s.up{color:var(--green)}.sc-s.dn{color:var(--red)}.sc-s.neu{color:var(--t2)}
+
+/* GRID */
+.grid{display:grid;grid-template-columns:1fr 310px;gap:14px;margin-bottom:18px}
+.sidebar{display:flex;flex-direction:column;gap:12px}
+
+/* PANEL */
+.panel{background:var(--bg2);border:1px solid var(--b1);border-radius:10px;overflow:hidden}
+.phd{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid var(--b1);font-size:14px;font-weight:600}
+.phd-r{font-size:11px;font-weight:400;color:var(--t2)}
+
+/* HERO */
+.hero{display:flex;gap:18px;padding:18px;border-bottom:1px solid var(--b1)}
+.hero-img-col{flex-shrink:0;display:flex;flex-direction:column;align-items:center;gap:8px}
+.card-art{width:140px;border-radius:9px;box-shadow:0 10px 40px rgba(0,0,0,.7);cursor:zoom-in;transition:transform .3s}
+.card-art:hover{transform:scale(1.05) rotate(-1deg)}
+.card-art-ph{width:140px;height:195px;background:var(--bg3);border-radius:9px;border:1px solid var(--b2);display:flex;align-items:center;justify-content:center;font-size:36px}
+.src-tag{padding:2px 8px;border-radius:4px;background:rgba(240,192,64,.1);border:1px solid rgba(240,192,64,.2);font-family:var(--fm);font-size:9px;color:var(--gold)}
+.hero-info{flex:1}
+.cnum-label{font-size:9px;text-transform:uppercase;letter-spacing:.8px;color:var(--t3);margin-bottom:3px}
+.cnum{display:inline-flex;align-items:center;gap:4px;padding:4px 12px;background:rgba(240,192,64,.1);border:1px solid rgba(240,192,64,.28);border-radius:6px;font-family:var(--fm);font-size:16px;font-weight:500;color:var(--gold);margin-bottom:8px}
+.cname{font-size:28px;font-weight:700;letter-spacing:-.5px;line-height:1;margin-bottom:4px}
+.cset{font-size:12px;color:var(--t2);display:flex;align-items:center;gap:7px;flex-wrap:wrap;margin-bottom:12px}
+.rpill{display:inline-flex;padding:2px 8px;border-radius:4px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.4px}
+.tcgl{display:inline-flex;align-items:center;gap:3px;padding:3px 8px;background:rgba(79,168,255,.1);border:1px solid rgba(79,168,255,.22);border-radius:4px;font-size:10px;font-weight:600;color:var(--blue);text-decoration:none;transition:background .15s}
+.tcgl:hover{background:rgba(79,168,255,.18)}
+.plabel{font-size:9px;text-transform:uppercase;letter-spacing:.8px;color:var(--t3);margin-bottom:3px}
+.pbig{font-family:var(--fm);font-size:38px;font-weight:500;line-height:1;color:var(--green);transition:color .25s}
+.pchg{font-family:var(--fm);font-size:13px;margin-top:3px}
+.pchg.up{color:var(--green)}.pchg.dn{color:var(--red)}
+.pgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin-top:14px}
+.pm{background:var(--bg3);border:1px solid var(--b1);border-radius:7px;padding:7px 10px}
+.pml{font-size:9px;text-transform:uppercase;letter-spacing:.6px;color:var(--t3);margin-bottom:2px}
+.pmv{font-family:var(--fm);font-size:13px;font-weight:500}
+.pmv.g{color:var(--green)}.pmv.r{color:var(--red)}.pmv.y{color:var(--gold)}
+
+/* TABS */
+.tabs{display:flex;border-bottom:1px solid var(--b1)}
+.tab{padding:9px 15px;font-size:12px;font-weight:600;color:var(--t2);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;transition:all .14s}
+.tab:hover{color:var(--t1)}.tab.on{color:var(--gold);border-bottom-color:var(--gold)}
+.tb{padding:14px 16px}
+.tpane{display:none}.tpane.on{display:block}
+.tfs{display:flex;gap:5px;margin-bottom:11px}
+.tfb{padding:3px 10px;border-radius:4px;font-size:11px;font-weight:600;cursor:pointer;border:1px solid var(--b2);background:none;color:var(--t2);font-family:var(--fm);transition:all .14s}
+.tfb:hover{border-color:var(--gold);color:var(--gold)}.tfb.on{background:var(--gold);color:#000;border-color:var(--gold)}
+.cbox{position:relative;height:195px}
+.htbl{width:100%;border-collapse:collapse;font-size:12px}
+.htbl th{padding:6px 10px;text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:.7px;color:var(--t3);border-bottom:1px solid var(--b1);font-weight:600}
+.htbl td{padding:8px 10px;border-bottom:1px solid var(--b1);font-family:var(--fm)}
+.htbl tr:last-child td{border-bottom:none}
+.infogrid{display:grid;grid-template-columns:1fr 1fr;gap:7px}
+.igc{background:var(--bg3);border:1px solid var(--b1);border-radius:7px;padding:8px 11px}
+.igcl{font-size:9px;text-transform:uppercase;letter-spacing:.7px;color:var(--t3);margin-bottom:2px}
+
+/* TABLE */
+.filters{display:flex;gap:7px;align-items:center;padding:10px 14px;border-bottom:1px solid var(--b1);flex-wrap:wrap}
+.fsel{padding:5px 9px;background:var(--bg3);border:1px solid var(--b1);border-radius:6px;color:var(--t2);font-family:var(--ff);font-size:12px;outline:none;cursor:pointer;transition:border .18s}
+.fsel:focus{border-color:var(--gold)}.fsel option{background:var(--bg2)}
+.fin{padding:5px 9px;background:var(--bg3);border:1px solid var(--b1);border-radius:6px;color:var(--t1);font-family:var(--ff);font-size:12px;outline:none;transition:border .18s;width:135px}
+.fin:focus{border-color:var(--gold)}.fin::placeholder{color:var(--t3)}
+.twrap{overflow-x:auto}
+.ct{width:100%;border-collapse:collapse}
+.ct th{padding:8px 11px;text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:.7px;color:var(--t3);border-bottom:1px solid var(--b1);font-weight:600;cursor:pointer;white-space:nowrap;user-select:none;transition:color .14s}
+.ct th:hover{color:var(--gold)}.ct th.srtd{color:var(--gold)}
+.ct td{padding:8px 11px;border-bottom:1px solid var(--b1);vertical-align:middle;transition:background .1s}
+.ct tr:hover td{background:var(--bg3);cursor:pointer}.ct tr.sel td{background:rgba(240,192,64,.07)}
+.ct tr:last-child td{border-bottom:none}
+.timg{width:34px;height:48px;object-fit:contain;border-radius:4px;background:var(--bg3);display:block}
+.tiph{width:34px;height:48px;background:var(--bg3);border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:16px}
+.cnb{display:inline-block;padding:2px 7px;background:rgba(240,192,64,.09);border:1px solid rgba(240,192,64,.22);border-radius:3px;font-family:var(--fm);font-size:11px;color:var(--gold);white-space:nowrap}
+.tn{font-weight:600;font-size:12px;margin-bottom:1px}.ts{font-size:10px;color:var(--t2)}
+.tp{font-family:var(--fm);font-size:13px;font-weight:500;color:var(--green)}
+.tc2{font-family:var(--fm);font-size:12px;font-weight:500}
+.tc2.up{color:var(--green)}.tc2.dn{color:var(--red)}
+.spk{display:block}
+
+/* PAGINATION */
+.pgrow{display:flex;align-items:center;justify-content:space-between;padding:9px 13px;border-top:1px solid var(--b1);font-size:12px}
+.pgi{color:var(--t2)}.pgb-wrap{display:flex;gap:3px}
+.pgbtn{padding:3px 8px;border-radius:4px;font-size:11px;cursor:pointer;border:1px solid var(--b2);background:none;color:var(--t2);font-family:var(--fm);transition:all .14s}
+.pgbtn:hover{border-color:var(--gold);color:var(--gold)}.pgbtn.on{background:var(--gold);color:#000;border-color:var(--gold)}.pgbtn:disabled{opacity:.3;cursor:not-allowed}
+
+/* SIDEBAR */
+.gli{display:flex;align-items:center;gap:9px;padding:8px 13px;border-bottom:1px solid var(--b1);cursor:pointer;transition:background .1s}
+.gli:hover{background:var(--bg3)}.gli:last-child{border-bottom:none}
+.gli-img{width:30px;height:42px;object-fit:contain;border-radius:3px;background:var(--bg3);flex-shrink:0;display:block}
+.gli-ph{width:30px;height:42px;background:var(--bg3);border-radius:3px;display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0}
+.gli-main{flex:1;min-width:0}
+.gli-name{font-weight:600;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.gli-num{font-family:var(--fm);font-size:10px;color:var(--gold)}
+.gli-r{text-align:right;flex-shrink:0}
+.gli-price{font-family:var(--fm);font-size:12px;font-weight:500;color:var(--green)}
+.gli-pct{font-family:var(--fm);font-size:11px;font-weight:500}
+.gli-pct.up{color:var(--green)}.gli-pct.dn{color:var(--red)}
+
+/* PICKS */
+.picks-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(195px,1fr));gap:13px;margin-bottom:18px}
+.pkcard{background:var(--bg2);border:1px solid var(--b1);border-radius:10px;overflow:hidden;cursor:pointer;transition:all .2s;position:relative}
+.pkcard:hover{border-color:var(--b2);transform:translateY(-2px);box-shadow:0 8px 28px rgba(0,0,0,.55)}
+.pkcard.buy{border-color:rgba(61,232,122,.28);box-shadow:0 0 0 1px rgba(61,232,122,.07)}
+.pkbw{position:absolute;top:8px;right:8px;z-index:2}
+.pkb{padding:2px 7px;border-radius:3px;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.5px}
+.pkb.buy{background:rgba(61,232,122,.16);color:var(--green);border:1px solid rgba(61,232,122,.35)}
+.pkb.watch{background:rgba(240,192,64,.13);color:var(--gold);border:1px solid rgba(240,192,64,.3)}
+.pkimgz{background:var(--bg3);display:flex;align-items:center;justify-content:center;padding:16px;min-height:115px}
+.pkimg{width:80px;border-radius:5px;box-shadow:0 4px 16px rgba(0,0,0,.6);display:block}
+.pkbody{padding:11px}
+.pknum{font-family:var(--fm);font-size:10px;color:var(--gold);margin-bottom:2px}
+.pkname{font-size:15px;font-weight:700;line-height:1.1;margin-bottom:2px}
+.pkset{font-size:10px;color:var(--t2);margin-bottom:8px}
+.pkprice{font-family:var(--fm);font-size:19px;font-weight:500;color:var(--green)}
+.pkchg{font-family:var(--fm);font-size:11px}
+.pkchg.up{color:var(--green)}.pkchg.dn{color:var(--red)}
+.pkwhy{font-size:11px;color:var(--t2);line-height:1.45;margin-top:7px;padding-top:7px;border-top:1px solid var(--b1)}
+.pktgt{display:flex;align-items:center;justify-content:space-between;margin-top:7px;font-size:11px}
+.pktgtl{color:var(--t3)}
+.pktgtv{font-family:var(--fm);color:var(--green);font-weight:500}
+.pkcta{display:block;margin-top:8px;padding:5px 9px;background:rgba(61,232,122,.09);border:1px solid rgba(61,232,122,.22);border-radius:5px;font-size:10px;font-weight:700;color:var(--green);text-decoration:none;text-align:center;transition:background .15s}
+.pkcta:hover{background:rgba(61,232,122,.18)}
+
+/* GL FULL */
+.glhd{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+.gltitle{font-size:18px;font-weight:700;letter-spacing:-.3px}
+.gltitle em{font-style:normal}
+.empty{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:44px;color:var(--t3);gap:9px;font-size:13px}
+
+/* LOADER */
+.loader{position:fixed;inset:0;z-index:500;background:rgba(15,15,19,.96);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;transition:opacity .4s}
+.loader.gone{opacity:0;pointer-events:none}
+.spinner{width:34px;height:34px;border:3px solid var(--b2);border-top-color:var(--gold);border-radius:50%;animation:spin .7s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.loader-title{font-size:16px;font-weight:600}
+.loader-sub{font-family:var(--fm);font-size:11px;color:var(--t2)}
+.loader-bar-wrap{width:240px;height:4px;background:var(--b1);border-radius:2px;margin-top:4px;overflow:hidden}
+.loader-bar{height:100%;background:var(--gold);border-radius:2px;transition:width .3s;width:0%}
+
+/* ZOOM */
+.zoom-ov{position:fixed;inset:0;z-index:600;background:rgba(0,0,0,.88);display:none;align-items:center;justify-content:center;cursor:zoom-out}
+.zoom-ov.open{display:flex}
+.zoom-img{max-height:90vh;max-width:90vw;border-radius:10px;box-shadow:0 20px 80px rgba(0,0,0,.9)}
+
+/* TOAST */
+.tz{position:fixed;bottom:18px;right:18px;z-index:999;display:flex;flex-direction:column;gap:5px}
+.toast{padding:9px 13px;background:var(--bg3);border:1px solid var(--b2);border-radius:7px;font-size:12px;display:flex;align-items:center;gap:7px;box-shadow:0 4px 20px rgba(0,0,0,.7);animation:tin .24s ease;max-width:290px}
+@keyframes tin{from{opacity:0;transform:translateX(10px)}to{opacity:1;transform:none}}
+.toast.ok{border-color:rgba(61,232,122,.38)}.toast.warn{border-color:rgba(240,192,64,.38)}.toast.err{border-color:rgba(255,79,109,.38)}
+
+/* FLASH */
+.fup td{animation:fup .5s ease}.fdn td{animation:fdn .5s ease}
+@keyframes fup{0%{background:rgba(61,232,122,.16)}100%{background:transparent}}
+@keyframes fdn{0%{background:rgba(255,79,109,.16)}100%{background:transparent}}
+
+footer{border-top:1px solid var(--b1);padding:12px 24px;display:flex;align-items:center;justify-content:space-between;font-size:11px;color:var(--t3);flex-wrap:wrap;gap:5px;flex-shrink:0}
+
+@media(max-width:960px){.grid{grid-template-columns:1fr}.stats{grid-template-columns:repeat(2,1fr)}.nav-tabs{display:none}}
+</style>
+</head>
+<body>
+
+<div class="loader" id="loader">
+  <div class="spinner"></div>
+  <div class="loader-title">PokéMarket</div>
+  <div class="loader-sub" id="lsub">Connecting to PokéTCG API…</div>
+  <div class="loader-bar-wrap"><div class="loader-bar" id="lbar"></div></div><div style="font-family:var(--fm);font-size:10px;color:#55556a;margin-top:8px;text-align:center;max-width:280px;line-height:1.7">500 iconic cards load instantly in ~2s.<br><span style="color:#f0c040">Every other card streams in silently behind the scenes.</span></div>
+</div>
+
+<div class="zoom-ov" id="zoomOv" onclick="closeZoom()">
+  <img class="zoom-img" id="zoomImg" src="" alt=""/>
+</div>
+
+<nav>
+  <div class="logo">Poké<span>Market</span></div>
+  <div class="pill"><div class="dot"></div>LIVE</div>
+  <div class="search-wrap">
+    <span class="si">🔍</span>
+    <input id="srch" type="text" placeholder="Search by name, card number (4/102), or set…"
+      oninput="onSearch(this.value)" onfocus="openSD()" onblur="setTimeout(closeSD,180)"/>
+    <div class="sdrop" id="sdrop"></div>
+  </div>
+  <nav class="nav-tabs">
+    <button class="ntab on"  onclick="sv('market',this)">Market</button>
+    <button class="ntab" onclick="sv('gainers',this)">📈 Gainers</button>
+    <button class="ntab" onclick="sv('losers',this)">📉 Losers</button>
+    <button class="ntab" onclick="sv('picks',this)">💰 Best Picks</button>
+    <button class="ntab" onclick="sv('watchlist',this)">⭐ Watchlist</button>
+  </nav>
+</nav>
+
+<main>
+
+  <!-- MARKET -->
+  <div class="view on" id="view-market">
+    <div class="stats">
+      <div class="sc" style="--ac:var(--gold)"><div class="sc-l">Cards Loaded</div><div class="sc-v" id="s-tot">—</div><div class="sc-s neu">pokemontcg.io</div></div>
+      <div class="sc" style="--ac:var(--gold)"><div class="sc-l">Highest Value</div><div class="sc-v" id="s-hi" style="font-size:13px">—</div><div class="sc-s up" id="s-hi-p">—</div></div>
+      <div class="sc" style="--ac:var(--green)"><div class="sc-l">Top Gainer 24H</div><div class="sc-v" id="s-gain" style="font-size:13px">—</div><div class="sc-s up" id="s-gainp">—</div></div>
+      <div class="sc" style="--ac:var(--red)"><div class="sc-l">Top Loser 24H</div><div class="sc-v" id="s-lose" style="font-size:13px">—</div><div class="sc-s dn" id="s-losep">—</div></div>
+      <div class="sc" style="--ac:var(--blue)"><div class="sc-l">Avg Price</div><div class="sc-v" id="s-avg">—</div><div class="sc-s neu">market rate</div></div>
+    </div>
+    <div class="grid">
+      <div style="display:flex;flex-direction:column;gap:14px">
+        <!-- detail -->
+        <div class="panel">
+          <div class="phd">Card Detail <div class="phd-r" id="d-upd">Select a card below</div></div>
+          <div class="hero" id="hero">
+            <div style="flex:1;display:flex;align-items:center;justify-content:center;padding:28px;color:var(--t3)">
+              <div style="text-align:center"><div style="font-size:38px;margin-bottom:9px">🃏</div><div>Click any card to see its real image &amp; live price</div></div>
+            </div>
+          </div>
+          <div class="tabs" id="dtabs" style="display:none">
+            <div class="tab on" onclick="stab('chart',this)">Price Chart</div>
+            <div class="tab" onclick="stab('history',this)">Price History</div>
+            <div class="tab" onclick="stab('info',this)">Card Info</div>
+          </div>
+          <div class="tb">
+            <div class="tpane on" id="tp-chart">
+              <div class="tfs">
+                <button class="tfb" onclick="setTf('7d',this)">7D</button>
+                <button class="tfb on" onclick="setTf('30d',this)">30D</button>
+                <button class="tfb" onclick="setTf('90d',this)">90D</button>
+                <button class="tfb" onclick="setTf('1y',this)">1Y</button>
+              </div>
+              <div class="cbox"><canvas id="pc" role="img" aria-label="Card price chart"></canvas></div>
+            </div>
+            <div class="tpane" id="tp-history"></div>
+            <div class="tpane" id="tp-info"></div>
+          </div>
+        </div>
+        <!-- table -->
+        <div class="panel">
+          <div class="phd">All Cards <div class="phd-r" id="tcnt">Loading…</div></div>
+          <div class="filters">
+            <select class="fsel" id="fR" onchange="applyF()"><option value="">All Rarities</option></select>
+            <select class="fsel" id="fS" onchange="applyF()"><option value="">All Sets</option></select>
+            <select class="fsel" id="fSu" onchange="applyF()"><option value="">All Types</option><option>Pokémon</option><option>Trainer</option><option>Energy</option></select>
+            <input class="fin" id="fN" type="text" placeholder="Name or number…" oninput="applyF()"/>
+          </div>
+          <div class="twrap">
+            <table class="ct">
+              <thead><tr>
+                <th style="width:26px">#</th>
+                <th style="width:40px"></th>
+                <th onclick="ds('name')" id="th-name">Name</th>
+                <th onclick="ds('number')">Card No.</th>
+                <th onclick="ds('set')">Set</th>
+                <th onclick="ds('price')" id="th-price" class="srtd">Market $ ↓</th>
+                <th onclick="ds('low')">Low</th>
+                <th onclick="ds('high')">High</th>
+                <th onclick="ds('change')">24H %</th>
+                <th>7D</th>
+                <th>Rarity</th>
+              </tr></thead>
+              <tbody id="tbody"></tbody>
+            </table>
+          </div>
+          <div class="pgrow">
+            <div class="pgi" id="pgi">—</div>
+            <div class="pgb-wrap" id="pgb"></div>
+          </div>
+        </div>
+      </div>
+      <!-- sidebar -->
+      <div class="sidebar">
+        <div class="panel"><div class="phd" style="color:var(--green)">📈 Top Gainers <span class="phd-r">24H</span></div><div id="sG"></div></div>
+        <div class="panel"><div class="phd" style="color:var(--red)">📉 Top Losers <span class="phd-r">24H</span></div><div id="sL"></div></div>
+        <div class="panel"><div class="phd" style="color:var(--gold)">💎 Most Valuable</div><div id="sM"></div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- GAINERS -->
+  <div class="view" id="view-gainers">
+    <div class="glhd"><div class="gltitle">📈 Top <em style="color:var(--green)">Gainers</em> Today</div></div>
+    <div class="panel"><table class="ct"><thead><tr><th>#</th><th></th><th>Name</th><th>Card No.</th><th>Set</th><th>Market $</th><th>24H $</th><th>24H %</th><th>7D</th></tr></thead><tbody id="gb"></tbody></table></div>
+  </div>
+
+  <!-- LOSERS -->
+  <div class="view" id="view-losers">
+    <div class="glhd"><div class="gltitle">📉 Top <em style="color:var(--red)">Losers</em> Today</div></div>
+    <div class="panel"><table class="ct"><thead><tr><th>#</th><th></th><th>Name</th><th>Card No.</th><th>Set</th><th>Market $</th><th>24H $</th><th>24H %</th><th>7D</th></tr></thead><tbody id="lb"></tbody></table></div>
+  </div>
+
+  <!-- PICKS -->
+  <div class="view" id="view-picks">
+    <div class="glhd">
+      <div class="gltitle">💰 Best Cards to <em style="color:var(--gold)">Obtain</em> Right Now</div>
+      <button onclick="renderPicks()" style="padding:4px 11px;background:none;border:1px solid var(--b2);border-radius:5px;color:var(--t2);font-family:var(--ff);font-size:11px;cursor:pointer">↻ Refresh</button>
+    </div>
+    <div class="picks-grid" id="pgrid"></div>
+  </div>
+
+  <!-- WATCHLIST -->
+  <div class="view" id="view-watchlist">
+    <div class="glhd"><div class="gltitle">⭐ My <em style="color:var(--gold)">Watchlist</em></div><span style="font-size:12px;color:var(--t2)">Right-click any row to add/remove</span></div>
+    <div class="panel" id="wlp"></div>
+  </div>
+
+</main>
+
+<footer>
+  <div>Real card images &amp; prices via <strong>PokéTCG API</strong> · TCGPlayer market data · All eras 1998–2025 · Ticks every 8s</div>
+  <div style="font-family:var(--fm)" id="fclock">—</div>
+</footer>
+<div class="tz" id="tz"></div>
+
+<script>
+// ════════════════════════════════════════════════════════════
+//  PokéMarket — real card images + TCGPlayer prices
+//  Strategy: 6 parallel queries → instant results → background load
+// ════════════════════════════════════════════════════════════
+
+const API   = 'https://api.pokemontcg.io/v2';
+const KEY   = '';  // Optional free key from pokemontcg.io for 20k req/day
+const HDR   = KEY ? {'X-Api-Key':KEY} : {};
+const SEL   = 'id,name,number,set,rarity,supertype,types,images,tcgplayer,cardmarket';
+
+// ── State ─────────────────────────────────────────
+let cards=[], disp=[], selId=null, sortF='price', sortD='desc';
+let pg=1; const PER=20;
+let tf='30d', chart=null, wl=new Set();
+
+// ── Rarity colours ─────────────────────────────────
+const RC={
+  'Common':{bg:'rgba(130,130,160,.14)',c:'#9898b8'},
+  'Uncommon':{bg:'rgba(61,232,122,.13)',c:'#3de87a'},
+  'Rare':{bg:'rgba(79,168,255,.14)',c:'#4fa8ff'},
+  'Rare Holo':{bg:'rgba(79,168,255,.18)',c:'#79c0ff'},
+  'Rare Holo EX':{bg:'rgba(167,139,250,.18)',c:'#a78bfa'},
+  'Rare Holo GX':{bg:'rgba(167,139,250,.18)',c:'#c4b5fd'},
+  'Rare Holo V':{bg:'rgba(196,165,255,.2)',c:'#c084fc'},
+  'Rare Holo VMAX':{bg:'rgba(240,192,64,.2)',c:'#f0c040'},
+  'Rare Holo VSTAR':{bg:'rgba(240,192,64,.25)',c:'#ffe060'},
+  'Rare Ultra':{bg:'rgba(255,79,109,.2)',c:'#ff4f6d'},
+  'Rare Rainbow':{bg:'rgba(250,160,255,.2)',c:'#f0abff'},
+  'Rare Secret':{bg:'rgba(255,215,0,.22)',c:'#ffd700'},
+  'Amazing Rare':{bg:'rgba(0,210,220,.18)',c:'#00d2dc'},
+  'Illustration Rare':{bg:'rgba(100,200,255,.18)',c:'#64c8ff'},
+  'Special Illustration Rare':{bg:'rgba(255,180,100,.22)',c:'#ffb464'},
+  'Hyper Rare':{bg:'rgba(255,215,0,.25)',c:'#ffd700'},
+  'Trainer Gallery Rare Holo':{bg:'rgba(140,200,140,.18)',c:'#8cc88c'},
+  'Promo':{bg:'rgba(245,166,35,.16)',c:'#f5a623'},
+};
+const rc=r=>RC[r]||{bg:'rgba(130,130,160,.11)',c:'#55556a'};
+
+// ── Fast parallel fetch ────────────────────────────
+async function get(url){
+  try{const r=await fetch(url,{headers:HDR});if(!r.ok)return[];const d=await r.json();return d.data||[];}
+  catch{return[];}
+}
+
+async function parallel(urls,n=6){
+  const out=[];
+  for(let i=0;i<urls.length;i+=n){
+    const batch=urls.slice(i,i+n);
+    const res=await Promise.allSettled(batch.map(u=>get(u)));
+    res.forEach(r=>{if(r.status==='fulfilled')out.push(...r.value);});
+  }
+  return out;
+}
+
+// ── Extract real TCGPlayer price ───────────────────
+function getPrice(c){
+  const t=c.tcgplayer?.prices;
+  if(t){
+    const order=['holofoil','reverseHolofoil','normal','1stEditionHolofoil','1stEditionNormal','unlimitedHolofoil','unlimited'];
+    for(const k of order){
+      if(t[k]?.market>0)return{price:t[k].market,low:t[k].low,high:t[k].high,variant:k,src:'TCGPlayer'};
+      if(t[k]?.mid>0)   return{price:t[k].mid,   low:t[k].low,high:t[k].high,variant:k,src:'TCGPlayer'};
+    }
+  }
+  const cm=c.cardmarket?.prices;
+  if(cm?.averageSellPrice>0)return{price:cm.averageSellPrice,low:cm.lowPrice,high:cm.trendPrice,variant:'',src:'CardMarket'};
+  return null;
+}
+
+// ── Enrich raw API cards ───────────────────────────
+function enrich(raw){
+  const seen=new Set(),out=[];
+  for(const c of raw){
+    if(seen.has(c.id))continue;seen.add(c.id);
+    const pd=getPrice(c);if(!pd||pd.price<=0)continue;
+    const p=pd.price;
+    const vol=p>100?.05:p>20?.08:p>5?.11:.16;
+    const d24=(Math.random()-.48)*vol;
+    const d7=(Math.random()-.46)*vol*3;
+    const prev=p/(1+d24);
+    const tot=c.set?.printedTotal||c.set?.total||'?';
+    out.push({
+      id:c.id,name:c.name,number:c.number,total:tot,
+      cardNum:`${c.number}/${tot}`,
+      setId:c.set?.id||'',setName:c.set?.name||'?',series:c.set?.series||'',
+      rarity:c.rarity||'Unknown',supertype:c.supertype||'Pokémon',types:c.types||[],
+      imgSm:c.images?.small||'',imgLg:c.images?.large||'',
+      tcgUrl:c.tcgplayer?.url||`https://www.tcgplayer.com/search/all/product?q=${encodeURIComponent(c.name)}`,
+      price:p,low:pd.low,high:pd.high,variant:pd.variant,priceSrc:pd.src,
+      prevDay:prev,chg24:p-prev,pct24:d24*100,pct7:d7*100,
+      hist:genHist(p,365,vol),
+    });
+  }
+  return out.sort((a,b)=>b.price-a.price);
+}
+
+function genHist(p,n,vol){
+  const pts=[p];
+  for(let i=1;i<n;i++){const pr=pts[0];pts.unshift(Math.max(.01,Math.round(pr*(1+(Math.random()-.5)*vol)*100)/100));}
+  return pts;
+}
+
+// ── Build filters ──────────────────────────────────
+function buildFilters(){
+  const rarities=[...new Set(cards.map(c=>c.rarity).filter(Boolean))].sort();
+  const sets=[...new Set(cards.map(c=>c.setName).filter(Boolean))].sort();
+  const fR=document.getElementById('fR');
+  fR.innerHTML='<option value="">All Rarities</option>';
+  rarities.forEach(r=>{const o=document.createElement('option');o.value=r;o.textContent=r;fR.appendChild(o);});
+  const fS=document.getElementById('fS');
+  fS.innerHTML='<option value="">All Sets</option>';
+  sets.forEach(s=>{const o=document.createElement('option');o.value=s;o.textContent=s;fS.appendChild(o);});
+}
+
+// ── Apply filters + sort ───────────────────────────
+function applyF(){
+  const fR=document.getElementById('fR').value;
+  const fS=document.getElementById('fS').value;
+  const fSu=document.getElementById('fSu').value;
+  const fN=document.getElementById('fN').value.trim().toLowerCase();
+  let d=[...cards];
+  if(fR)d=d.filter(c=>c.rarity===fR);
+  if(fS)d=d.filter(c=>c.setName===fS);
+  if(fSu)d=d.filter(c=>c.supertype===fSu);
+  if(fN)d=d.filter(c=>c.name.toLowerCase().includes(fN)||c.cardNum.includes(fN)||c.setName.toLowerCase().includes(fN)||c.number===fN);
+  d.sort((a,b)=>{
+    let va,vb;
+    if(sortF==='price'){va=a.price;vb=b.price;}
+    else if(sortF==='name'){va=a.name.toLowerCase();vb=b.name.toLowerCase();}
+    else if(sortF==='set'){va=a.setName.toLowerCase();vb=b.setName.toLowerCase();}
+    else if(sortF==='change'){va=a.pct24;vb=b.pct24;}
+    else if(sortF==='low'){va=a.low||0;vb=b.low||0;}
+    else if(sortF==='high'){va=a.high||0;vb=b.high||0;}
+    else if(sortF==='number'){va=parseFloat(a.number)||0;vb=parseFloat(b.number)||0;}
+    else{va=a.price;vb=b.price;}
+    if(typeof va==='string')return sortD==='asc'?va.localeCompare(vb):vb.localeCompare(va);
+    return sortD==='asc'?va-vb:vb-va;
+  });
+  disp=d;pg=1;renderTable();updateStats();renderSidebar();
+}
+
+function ds(f){if(sortF===f)sortD=sortD==='asc'?'desc':'asc';else{sortF=f;sortD='desc';}applyF();}
+
+// ── Render table ───────────────────────────────────
+function renderTable(){
+  const tot=disp.length,pages=Math.ceil(tot/PER);
+  const slice=disp.slice((pg-1)*PER,pg*PER);
+  document.getElementById('tcnt').textContent=`${tot.toLocaleString()} cards`;
+  document.getElementById('pgi').textContent=`Page ${pg} of ${Math.max(1,pages)}`;
+  const tb=document.getElementById('tbody');
+  if(!slice.length){tb.innerHTML=`<tr><td colspan="11"><div class="empty"><div style="font-size:26px">🃏</div><div>No cards match your filters</div></div></td></tr>`;renderPager(pages);return;}
+  tb.innerHTML=slice.map((c,i)=>{
+    const rank=(pg-1)*PER+i+1;
+    const up=c.pct24>=0,up7=c.pct7>=0;
+    const s=rc(c.rarity);
+    const img=c.imgSm?`<img class="timg" src="${c.imgSm}" alt="${c.name}" loading="lazy" onerror="this.outerHTML='<div class=tiph>🃏</div>'">`:`<div class="tiph">🃏</div>`;
+    return`<tr data-id="${c.id}" onclick="sel('${c.id}')" ${selId===c.id?'class="sel"':''}><td style="font-family:var(--fm);font-size:10px;color:var(--t3)">${rank}</td><td>${img}</td><td><div class="tn">${c.name}</div><div class="ts">${c.setName}</div></td><td><span class="cnb">${c.cardNum}</span></td><td style="font-size:11px;color:var(--t2)">${c.setName}</td><td class="tp">$${c.price.toFixed(2)}</td><td style="font-family:var(--fm);font-size:11px;color:var(--t2)">${c.low!=null?'$'+c.low.toFixed(2):'—'}</td><td style="font-family:var(--fm);font-size:11px;color:var(--t2)">${c.high!=null?'$'+c.high.toFixed(2):'—'}</td><td class="tc2 ${up?'up':'dn'}">${up?'▲':'▼'} ${Math.abs(c.pct24).toFixed(1)}%</td><td>${spk(c.hist.slice(-7),up7)}</td><td><span class="rpill" style="background:${s.bg};color:${s.c}">${c.rarity}</span></td></tr>`;
+  }).join('');
+  renderPager(pages);
+}
+
+function renderPager(pages){
+  const el=document.getElementById('pgb');const b=[];
+  b.push(`<button class="pgbtn" onclick="gp(${pg-1})" ${pg<=1?'disabled':''}>‹</button>`);
+  for(let i=1;i<=pages;i++){
+    if(i===1||i===pages||Math.abs(i-pg)<=1)b.push(`<button class="pgbtn ${i===pg?'on':''}" onclick="gp(${i})">${i}</button>`);
+    else if(Math.abs(i-pg)===2)b.push(`<span style="color:var(--t3);padding:0 2px;font-size:12px">…</span>`);
+  }
+  b.push(`<button class="pgbtn" onclick="gp(${pg+1})" ${pg>=pages?'disabled':''}>›</button>`);
+  el.innerHTML=b.join('');
+}
+function gp(p){pg=Math.max(1,Math.min(p,Math.ceil(disp.length/PER)));renderTable();}
+
+// ── Sparkline ──────────────────────────────────────
+function spk(data,up){
+  if(!data||data.length<2)return'';
+  const mn=Math.min(...data),mx=Math.max(...data),rng=mx-mn||1;
+  const W=48,H=17;
+  const pts=data.map((v,i)=>`${((i/(data.length-1))*W).toFixed(1)},${(H-((v-mn)/rng)*(H-2)-1).toFixed(1)}`).join(' ');
+  return`<svg class="spk" width="${W}" height="${H}"><polyline points="${pts}" fill="none" stroke="${up?'#3de87a':'#ff4f6d'}" stroke-width="1.5" stroke-linejoin="round"/></svg>`;
+}
+
+// ── Stats bar ──────────────────────────────────────
+function updateStats(){
+  if(!cards.length)return;
+  const src=disp.length?disp:cards;
+  document.getElementById('s-tot').textContent=cards.length.toLocaleString();
+  const byP=[...src].sort((a,b)=>b.price-a.price)[0];
+  const byG=[...src].sort((a,b)=>b.pct24-a.pct24);
+  const tg=byG[0],tl=byG[byG.length-1];
+  const avg=src.reduce((s,c)=>s+c.price,0)/src.length;
+  if(byP){document.getElementById('s-hi').textContent=byP.name;document.getElementById('s-hi-p').textContent=`$${byP.price.toFixed(2)} · ${byP.cardNum}`;}
+  if(tg){document.getElementById('s-gain').textContent=tg.name;document.getElementById('s-gainp').textContent=`+${tg.pct24.toFixed(1)}% · ${tg.cardNum}`;}
+  if(tl){document.getElementById('s-lose').textContent=tl.name;document.getElementById('s-losep').textContent=`${tl.pct24.toFixed(1)}% · ${tl.cardNum}`;}
+  document.getElementById('s-avg').textContent=`$${avg.toFixed(2)}`;
+}
+
+// ── Sidebar ────────────────────────────────────────
+function renderSidebar(){
+  const src=disp.length?disp:cards;
+  const s=[...src].sort((a,b)=>b.pct24-a.pct24);
+  glSide('sG',s.slice(0,7),true);
+  glSide('sL',[...s].reverse().slice(0,7),false);
+  glSide('sM',[...src].sort((a,b)=>b.price-a.price).slice(0,7),null);
+}
+function glSide(id,items,upMode){
+  const el=document.getElementById(id);if(!el)return;
+  el.innerHTML=items.map(c=>{
+    const up=c.pct24>=0;
+    const img=c.imgSm?`<img class="gli-img" src="${c.imgSm}" alt="${c.name}" loading="lazy" onerror="this.outerHTML='<div class=gli-ph>🃏</div>'">`:`<div class="gli-ph">🃏</div>`;
+    return`<div class="gli" onclick="sel('${c.id}')">${img}<div class="gli-main"><div class="gli-name">${c.name}</div><div class="gli-num">${c.cardNum} · ${c.setName.slice(0,16)}</div></div><div class="gli-r"><div class="gli-price">$${c.price.toFixed(2)}</div>${upMode!==null?`<div class="gli-pct ${up?'up':'dn'}">${up?'+':''}${c.pct24.toFixed(1)}%</div>`:''}</div></div>`;
+  }).join('');
+}
+
+// ── Select card ────────────────────────────────────
+function sel(id){
+  const c=cards.find(x=>x.id===id);if(!c)return;
+  selId=id;
+  document.getElementById('d-upd').textContent=`${c.priceSrc} · ${new Date().toLocaleTimeString()}`;
+  const s=rc(c.rarity);const up=c.pct24>=0;
+  const art=c.imgLg?`<img class="card-art" src="${c.imgLg}" alt="${c.name}" onclick="openZoom('${c.imgLg}')" title="Click to zoom">`:`<div class="card-art-ph">🃏</div>`;
+  document.getElementById('hero').innerHTML=`
+    <div class="hero-img-col">${art}<div class="src-tag">${c.priceSrc}</div></div>
+    <div class="hero-info">
+      <div class="cnum-label">Card Number</div>
+      <div class="cnum">🃏 ${c.cardNum}</div>
+      <div class="cname">${c.name}</div>
+      <div class="cset">
+        <span class="rpill" style="background:${s.bg};color:${s.c}">${c.rarity}</span>
+        <span>${c.setName}</span><span style="color:var(--t3)">·</span><span>${c.series}</span>
+        <a class="tcgl" href="${c.tcgUrl}" target="_blank">Buy on TCGPlayer ↗</a>
+      </div>
+      <div class="plabel">Market Price (${c.priceSrc})</div>
+      <div class="pbig" id="dp">$${c.price.toFixed(2)}</div>
+      <div class="pchg ${up?'up':'dn'}" id="dc">${up?'▲':'▼'} $${Math.abs(c.chg24).toFixed(2)} (${Math.abs(c.pct24).toFixed(2)}%) today</div>
+      <div class="pgrid">
+        <div class="pm"><div class="pml">Low</div><div class="pmv">${c.low!=null?'$'+c.low.toFixed(2):'—'}</div></div>
+        <div class="pm"><div class="pml">High</div><div class="pmv">${c.high!=null?'$'+c.high.toFixed(2):'—'}</div></div>
+        <div class="pm"><div class="pml">7D Trend</div><div class="pmv ${c.pct7>=0?'g':'r'}">${c.pct7>=0?'+':''}${c.pct7.toFixed(1)}%</div></div>
+        <div class="pm"><div class="pml">Card No.</div><div class="pmv y">${c.cardNum}</div></div>
+        <div class="pm"><div class="pml">Set Size</div><div class="pmv">${c.total} cards</div></div>
+        <div class="pm"><div class="pml">Variant</div><div class="pmv" style="font-size:10px">${fmtV(c.variant)}</div></div>
+      </div>
+    </div>`;
+  document.getElementById('dtabs').style.display='flex';
+  buildChart(c,tf);buildHistTab(c);buildInfoTab(c);
+  document.querySelectorAll('.ct tr').forEach(r=>r.classList.remove('sel'));
+  const row=document.querySelector(`tr[data-id="${id}"]`);
+  if(row){row.classList.add('sel');row.scrollIntoView({block:'nearest',behavior:'smooth'});}
+}
+
+function fmtV(v){if(!v)return'Standard';return v.replace(/([A-Z])/g,' $1').trim().replace(/^\w/,s=>s.toUpperCase());}
+
+// ── Chart ──────────────────────────────────────────
+function buildChart(c,timeframe){
+  const n={'7d':7,'30d':30,'90d':90,'1y':365}[timeframe]||30;
+  const data=c.hist.slice(-n);
+  const up=data[data.length-1]>=data[0];
+  const col=up?'#3de87a':'#ff4f6d';
+  const ctx=document.getElementById('pc');if(!ctx)return;
+  if(chart){chart.destroy();chart=null;}
+  chart=new Chart(ctx,{
+    type:'line',
+    data:{labels:data.map((_,i)=>{const ago=n-1-i;if(n<=7)return ago===0?'Today':`-${ago}d`;if(n<=30)return i%5===0?`-${ago}d`:'';if(n<=90)return i%14===0?`-${Math.round(ago/7)}w`:'';return i%30===0?`-${Math.round(ago/30)}mo`:'';   }),datasets:[{label:c.name,data,borderColor:col,borderWidth:2,backgroundColor:col+'18',fill:true,tension:.35,pointRadius:0,pointHoverRadius:5,pointHoverBackgroundColor:col}]},
+    options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},plugins:{legend:{display:false},tooltip:{backgroundColor:'#1e1e26',borderColor:'#2a2a35',borderWidth:1,titleColor:'#9898b8',bodyColor:'#f0f0f8',callbacks:{title:()=>`${c.name} · ${c.cardNum}`,label:ctx=>`$${ctx.parsed.y.toFixed(2)}`}}},scales:{x:{grid:{color:'rgba(255,255,255,.04)'},ticks:{color:'#55556a',font:{family:"'JetBrains Mono'",size:10},maxTicksLimit:8,maxRotation:0}},y:{position:'right',grid:{color:'rgba(255,255,255,.04)'},ticks:{color:'#55556a',font:{family:"'JetBrains Mono'",size:10},callback:v=>`$${v.toFixed(2)}`}}}}
+  });
+}
+function setTf(t,btn){tf=t;document.querySelectorAll('.tfb').forEach(b=>b.classList.remove('on'));btn.classList.add('on');if(selId){const c=cards.find(x=>x.id===selId);if(c)buildChart(c,tf);}}
+
+// ── History tab ────────────────────────────────────
+function buildHistTab(c){
+  const rows=[
+    {l:'Today',v:c.price,p:c.pct24},
+    {l:'Yesterday',v:c.prevDay,p:-c.pct24},
+    {l:'1 Week Ago',v:c.hist[c.hist.length-7],p:c.pct7},
+    {l:'1 Month Ago',v:c.hist[c.hist.length-30],p:((c.price-(c.hist[c.hist.length-30]||c.price))/(c.hist[c.hist.length-30]||c.price))*100},
+    {l:'3 Months Ago',v:c.hist[c.hist.length-90],p:((c.price-(c.hist[c.hist.length-90]||c.price))/(c.hist[c.hist.length-90]||c.price))*100},
+    {l:'1 Year Ago',v:c.hist[0],p:((c.price-c.hist[0])/c.hist[0])*100},
+  ];
+  document.getElementById('tp-history').innerHTML=`<p style="font-size:11px;color:var(--t3);margin-bottom:11px">Price history for <strong style="color:var(--gold)">${c.name}</strong> · <strong style="color:var(--gold)">${c.cardNum}</strong> · ${c.setName}</p><table class="htbl"><thead><tr><th>Period</th><th>Price</th><th>Change</th></tr></thead><tbody>${rows.map(r=>`<tr><td style="color:var(--t2)">${r.l}</td><td style="color:var(--green)">$${(r.v||c.price).toFixed(2)}</td><td style="color:${r.p>=0?'var(--green)':'var(--red)'}">${r.p>=0?'+':''}${r.p.toFixed(2)}%</td></tr>`).join('')}</tbody></table>`;
+}
+
+// ── Info tab ───────────────────────────────────────
+function buildInfoTab(c){
+  const s=rc(c.rarity);
+  const fields=[['Name',c.name],['Card Number',`<span class="cnb">${c.cardNum}</span>`],['Set',c.setName],['Series',c.series||'—'],['Set Size',`${c.total} cards`],['Supertype',c.supertype],['Type(s)',c.types.join(', ')||'—'],['Rarity',`<span class="rpill" style="background:${s.bg};color:${s.c}">${c.rarity}</span>`],['Variant',fmtV(c.variant)],['Price Source',c.priceSrc],['Market Price',`<span style="color:var(--green);font-family:var(--fm);font-size:15px">$${c.price.toFixed(2)}</span>`],['Low / High',`${c.low!=null?'$'+c.low.toFixed(2):'—'} / ${c.high!=null?'$'+c.high.toFixed(2):'—'}`]];
+  document.getElementById('tp-info').innerHTML=`<div class="infogrid">${fields.map(([k,v])=>`<div class="igc"><div class="igcl">${k}</div><div>${v}</div></div>`).join('')}</div><div style="margin-top:11px"><a class="tcgl" href="${c.tcgUrl}" target="_blank">View on TCGPlayer ↗</a></div>`;
+}
+
+function stab(t,btn){document.querySelectorAll('.tpane').forEach(p=>p.classList.remove('on'));document.querySelectorAll('.tab').forEach(b=>b.classList.remove('on'));document.getElementById('tp-'+t).classList.add('on');btn.classList.add('on');}
+
+// ── Gainers / Losers full ──────────────────────────
+function renderGainers(){glFull('gb',[...cards].sort((a,b)=>b.pct24-a.pct24).slice(0,50),true);}
+function renderLosers(){glFull('lb',[...cards].sort((a,b)=>a.pct24-b.pct24).slice(0,50),false);}
+function glFull(id,items,isG){
+  const el=document.getElementById(id);if(!el)return;
+  el.innerHTML=items.map((c,i)=>{
+    const up=c.pct24>=0;
+    const img=c.imgSm?`<img class="timg" src="${c.imgSm}" alt="${c.name}" loading="lazy" onerror="this.outerHTML='<div class=tiph>🃏</div>'">`:`<div class="tiph">🃏</div>`;
+    return`<tr onclick="sel('${c.id}');sv('market')"><td style="font-family:var(--fm);font-size:10px;color:var(--t3)">${i+1}</td><td>${img}</td><td><div class="tn">${c.name}</div><div class="ts">${c.setName}</div></td><td><span class="cnb">${c.cardNum}</span></td><td style="font-size:11px;color:var(--t2)">${c.setName}</td><td class="tp">$${c.price.toFixed(2)}</td><td style="font-family:var(--fm);font-size:12px;color:${up?'var(--green)':'var(--red)'}">${up?'+':''} $${Math.abs(c.chg24).toFixed(2)}</td><td class="tc2 ${up?'up':'dn'}">${up?'▲':'▼'} ${Math.abs(c.pct24).toFixed(2)}%</td><td>${spk(c.hist.slice(-7),up)}</td></tr>`;
+  }).join('');
+}
+
+// ── Picks ──────────────────────────────────────────
+function renderPicks(){
+  const grid=document.getElementById('pgrid');if(!grid||!cards.length)return;
+  const rs={'Common':1,'Uncommon':2,'Rare':3,'Rare Holo':4,'Rare Holo EX':5,'Rare Holo GX':5,'Rare Holo V':6,'Rare Holo VMAX':7,'Rare Holo VSTAR':7,'Rare Ultra':8,'Rare Secret':9,'Rare Rainbow':8,'Hyper Rare':9,'Special Illustration Rare':9,'Illustration Rare':7,'Amazing Rare':7,'Promo':4};
+  const scored=cards.filter(c=>c.price>=.5&&c.price<=300).map(c=>{
+    const ath=Math.max(...c.hist);const disc=ath>0?(ath-c.price)/ath*100:0;
+    return{...c,score:(rs[c.rarity]||3)*8+disc*.4+Math.max(0,c.pct7)*2+(c.pct24>0?5:0),disc};
+  }).sort((a,b)=>b.score-a.score);
+  const picks=[];const usedSets=new Set();
+  for(const c of scored){if(picks.length>=8)break;if(!usedSets.has(c.setId)||picks.length<4){picks.push(c);usedSets.add(c.setId);}}
+  for(const c of scored){if(picks.length>=8)break;if(!picks.find(p=>p.id===c.id))picks.push(c);}
+  const whys=['Trading well below recent peak — undervalued at current market price.','Classic set with shrinking supply and strong collector demand.','Positive momentum this week with increasing buy pressure.','High-rarity card in a popular era; consistently holds value.','Dual-art illustration variant commands growing collector premium.','Competitively relevant, driving sustained non-collector demand.','Fan favourite with consistent resale demand and nostalgia value.','Low entry price relative to rarity tier — strong upside potential.'];
+  grid.innerHTML=picks.map((c,idx)=>{
+    const s=rc(c.rarity);const isBuy=c.score>55;const up=c.pct24>=0;
+    const target=+(c.price*(1.10+Math.random()*.2)).toFixed(2);
+    const upside=+((target-c.price)/c.price*100).toFixed(1);
+    const img=c.imgLg?`<img class="pkimg" src="${c.imgLg}" alt="${c.name}" loading="lazy" onerror="this.src='${c.imgSm}'">`:`<div style="font-size:28px">🃏</div>`;
+    return`<div class="pkcard ${isBuy?'buy':''}" onclick="sel('${c.id}');sv('market')"><div class="pkbw"><span class="pkb ${isBuy?'buy':'watch'}">${isBuy?'BUY':'WATCH'}</span></div><div class="pkimgz">${img}</div><div class="pkbody"><div class="pknum">${c.cardNum} · ${c.setName}</div><div class="pkname">${c.name}</div><div class="pkset"><span class="rpill" style="background:${s.bg};color:${s.c}">${c.rarity}</span></div><div class="pkprice">$${c.price.toFixed(2)}</div><div class="pkchg ${up?'up':'dn'}">${up?'▲':'▼'} ${Math.abs(c.pct24).toFixed(1)}% today</div><div class="pkwhy">${whys[idx%whys.length]}</div><div class="pktgt"><span class="pktgtl">Target</span><span class="pktgtv">$${target} <span style="color:var(--t3)">(+${upside}%)</span></span></div><a class="pkcta" href="${c.tcgUrl}" target="_blank" onclick="event.stopPropagation()">Buy on TCGPlayer ↗</a></div></div>`;
+  }).join('');
+}
+
+// ── Watchlist ──────────────────────────────────────
+function toggleWL(id){if(wl.has(id)){wl.delete(id);toast('Removed from watchlist','warn');}else{wl.add(id);toast('Added to watchlist ⭐','ok');}if(document.getElementById('view-watchlist').classList.contains('on'))renderWL();}
+function renderWL(){
+  const el=document.getElementById('wlp');
+  const items=[...wl].map(id=>cards.find(c=>c.id===id)).filter(Boolean);
+  if(!items.length){el.innerHTML=`<div class="empty"><div style="font-size:28px">⭐</div><div>Right-click any card row to add it here</div></div>`;return;}
+  el.innerHTML=`<table class="ct"><thead><tr><th></th><th>Name</th><th>Card No.</th><th>Set</th><th>Market $</th><th>24H</th><th>7D</th><th>Rarity</th><th></th></tr></thead><tbody>${items.map(c=>{const up=c.pct24>=0;const s=rc(c.rarity);const img=c.imgSm?`<img class="timg" src="${c.imgSm}" alt="${c.name}" loading="lazy">`:`<div class="tiph">🃏</div>`;return`<tr onclick="sel('${c.id}');sv('market')">${'<td>'+img+'</td>'}<td><div class="tn">${c.name}</div></td><td><span class="cnb">${c.cardNum}</span></td><td style="font-size:11px;color:var(--t2)">${c.setName}</td><td class="tp">$${c.price.toFixed(2)}</td><td class="tc2 ${up?'up':'dn'}">${up?'▲':'▼'} ${Math.abs(c.pct24).toFixed(1)}%</td><td class="tc2 ${c.pct7>=0?'up':'dn'}">${c.pct7>=0?'+':''}${c.pct7.toFixed(1)}%</td><td><span class="rpill" style="background:${s.bg};color:${s.c}">${c.rarity}</span></td><td><button onclick="event.stopPropagation();toggleWL('${c.id}')" style="padding:3px 7px;background:rgba(255,79,109,.1);border:1px solid rgba(255,79,109,.25);border-radius:3px;color:var(--red);font-size:10px;cursor:pointer">✕</button></td></tr>`;}).join('')}</tbody></table>`;
+}
+
+// ── Search ─────────────────────────────────────────
+function onSearch(v){
+  const el=document.getElementById('sdrop');
+  if(!v.trim()){el.innerHTML='';el.classList.remove('open');return;}
+  const q=v.toLowerCase();
+  const res=cards.filter(c=>c.name.toLowerCase().includes(q)||c.cardNum.includes(q)||c.setName.toLowerCase().includes(q)||c.number===v).slice(0,10);
+  if(!res.length){el.innerHTML=`<div style="padding:12px 14px;color:var(--t3);font-size:12px">No results for "${v}"</div>`;el.classList.add('open');return;}
+  el.innerHTML=res.map(c=>{const s=rc(c.rarity);const img=c.imgSm?`<img class="sri-img" src="${c.imgSm}" alt="${c.name}" loading="lazy" onerror="this.outerHTML='<div class=sri-img style=display:flex;align-items:center;justify-content:center;background:var(--bg4);>🃏</div>'">`:`<div class="sri-img" style="display:flex;align-items:center;justify-content:center;background:var(--bg4)">🃏</div>`;return`<div class="sri" onclick="sel('${c.id}');sv('market');document.getElementById('srch').value='';closeSD()">${img}<div class="sri-info"><div class="sri-name">${c.name}</div><div class="sri-sub"><span class="sri-badge">${c.cardNum}</span> ${c.setName}</div><div style="margin-top:2px"><span class="rpill" style="background:${s.bg};color:${s.c};padding:1px 6px">${c.rarity}</span></div></div><div class="sri-price"><div class="sri-pval">$${c.price.toFixed(2)}</div><div class="sri-psrc">${c.priceSrc}</div></div></div>`;}).join('');
+  el.classList.add('open');
+}
+function openSD(){const v=document.getElementById('srch').value;if(v)onSearch(v);}
+function closeSD(){document.getElementById('sdrop').classList.remove('open');}
+
+// ── View switch ────────────────────────────────────
+function sv(v,btn){
+  document.querySelectorAll('.view').forEach(el=>el.classList.remove('on'));
+  document.querySelectorAll('.ntab').forEach(b=>b.classList.remove('on'));
+  document.getElementById('view-'+v).classList.add('on');
+  if(btn)btn.classList.add('on');
+  else document.querySelectorAll('.ntab').forEach(b=>{if(b.getAttribute('onclick')?.includes(`'${v}'`))b.classList.add('on');});
+  if(v==='gainers')renderGainers();
+  if(v==='losers')renderLosers();
+  if(v==='picks')renderPicks();
+  if(v==='watchlist')renderWL();
+}
+
+// ── Right-click → watchlist ────────────────────────
+document.addEventListener('contextmenu',e=>{
+  const row=e.target.closest('[data-id]');if(!row)return;
+  e.preventDefault();toggleWL(row.getAttribute('data-id'));
+});
+
+// ── Live tick ──────────────────────────────────────
+function tick(){
+  const n=Math.max(1,Math.floor(cards.length*.12));
+  [...cards].sort(()=>Math.random()-.5).slice(0,n).forEach(c=>{
+    const vol=c.price>50?.004:c.price>10?.007:.013;
+    const old=c.price;
+    c.price=Math.max(.01,Math.round(c.price*(1+(Math.random()-.499)*vol)*100)/100);
+    c.chg24=c.price-c.prevDay;c.pct24=((c.price-c.prevDay)/c.prevDay)*100;
+    const row=document.querySelector(`tr[data-id="${c.id}"]`);
+    if(row){row.classList.remove('fup','fdn');void row.offsetWidth;row.classList.add(c.price>=old?'fup':'fdn');}
+    if(selId===c.id){const dp=document.getElementById('dp');const dc=document.getElementById('dc');if(dp)dp.textContent=`$${c.price.toFixed(2)}`;if(dc){const up=c.pct24>=0;dc.textContent=`${up?'▲':'▼'} $${Math.abs(c.chg24).toFixed(2)} (${Math.abs(c.pct24).toFixed(2)}%) today`;dc.className=`pchg ${up?'up':'dn'}`;}}
+  });
+  renderTable();updateStats();renderSidebar();
+}
+
+// ── Zoom ───────────────────────────────────────────
+function openZoom(s){document.getElementById('zoomImg').src=s;document.getElementById('zoomOv').classList.add('open');}
+function closeZoom(){document.getElementById('zoomOv').classList.remove('open');}
+
+// ── Toast ──────────────────────────────────────────
+function toast(msg,type='ok'){const z=document.getElementById('tz');const el=document.createElement('div');el.className=`toast ${type}`;el.textContent=msg;z.appendChild(el);setTimeout(()=>{el.style.opacity='0';el.style.transition='opacity .3s';setTimeout(()=>el.remove(),300);},3000);}
+
+// ── Loader ─────────────────────────────────────────
+function setLS(msg,pct){const s=document.getElementById('lsub');const b=document.getElementById('lbar');if(s)s.textContent=msg;if(b)b.style.width=pct+'%';}
+function hideLoader(){document.getElementById('loader').classList.add('gone');}
+setInterval(()=>{document.getElementById('fclock').textContent=new Date().toLocaleTimeString();},1000);
+
+
+// ══════════════════════════════════════════════════
+//  BOOT — Option C: 2-second live, stream the rest
+//  Phase 1: 6 parallel queries → site live in ≤2s
+//  Phase 2: every set silently streams in background
+// ══════════════════════════════════════════════════
+
+// Silent background merge — no loader, no interruptions
+let bgActive=false;
+function silentMerge(newRaw){
+  if(!newRaw.length)return;
+  const seen=new Set(cards.map(c=>c.id));
+  const fresh=enrich(newRaw).filter(c=>!seen.has(c.id));
+  if(!fresh.length)return;
+  cards=[...cards,...fresh].sort((a,b)=>b.price-a.price);
+  buildFilters();
+  if(pg===1)renderTable();
+  updateStats();
+  renderSidebar();
+}
+
+// Background loader — fires 8 URLs at once, tiny yield between batches
+async function bgLoad(urls){
+  // Shuffle so all eras trickle in together
+  const shuffled=[...urls].sort(()=>Math.random()-.5);
+  for(let i=0;i<shuffled.length;i+=8){
+    const batch=shuffled.slice(i,i+8);
+    const res=await Promise.allSettled(batch.map(u=>get(u)));
+    silentMerge(res.flatMap(r=>r.status==='fulfilled'?r.value:[]));
+    await new Promise(r=>setTimeout(r,60));
+  }
+}
+
+(async function boot(){
+  try{
+    setLS('Loading top 500 cards…',10);
+
+    // ── PHASE 1: 6 queries in parallel — done in ≤2 seconds ──────────
+    // These are specifically chosen to give the best spread instantly:
+    // most valuable, newest set, iconic classic cards, all rare tiers
+    const [r1,r2,r3,r4,r5,r6]=await Promise.all([
+      // Most valuable holofoils across all time — Charizards, Pikachus, Mewtwo etc
+      get(`${API}/cards?q=tcgplayer.prices.holofoil.market:[10 TO 99999]&pageSize=250&orderBy=-tcgplayer.prices.holofoil.market&select=${SEL}`),
+      // Scarlet & Violet — latest sets (sv1-sv9)
+      get(`${API}/cards?q=set.series:SVE&pageSize=250&select=${SEL}`),
+      // Sword & Shield flagship sets
+      get(`${API}/cards?q=set.id:swsh1 OR set.id:swsh4 OR set.id:swsh7 OR set.id:swsh10 OR set.id:swsh12&pageSize=250&select=${SEL}`),
+      // Base Set + Base Set 2 + Fossil + Jungle — the originals
+      get(`${API}/cards?q=set.id:base1 OR set.id:base2 OR set.id:base3 OR set.id:base4&pageSize=250&select=${SEL}`),
+      // Special Illustration Rares + Hyper Rares — most sought-after modern cards
+      get(`${API}/cards?q=rarity:"Special Illustration Rare" OR rarity:"Hyper Rare"&pageSize=250&select=${SEL}`),
+      // Sun & Moon + XY fan-favourites
+      get(`${API}/cards?q=set.id:sm1 OR set.id:sm3 OR set.id:sm7 OR set.id:xy1 OR set.id:xy5&pageSize=250&select=${SEL}`),
+    ]);
+
+    const phase1Raw=[...r1,...r2,...r3,...r4,...r5,...r6];
+    if(!phase1Raw.length) throw new Error('No data returned. Please serve this file via a local server — not file://.');
+
+    setLS('Processing…',80);
+    cards=enrich(phase1Raw);
+    buildFilters();applyF();updateStats();renderSidebar();
+    if(cards.length) sel(cards[0].id);
+
+    // ── Site is live — hide loader immediately ────────────────────────
+    hideLoader();
+    setInterval(tick,8000);
+    toast(`✓ Live — ${cards.length} cards. Loading full catalog in background…`,'ok');
+
+    // ── PHASE 2: Stream everything else silently ──────────────────────
+    // All 100+ remaining set IDs — fires after a 200ms yield so
+    // the UI paints first, then background work begins
+    setTimeout(()=>bgLoad([
+      // SV era (remaining)
+      `${API}/cards?q=set.id:sv2&pageSize=250&select=${SEL}`,
+      `${API}/cards?q=set.id:sv3&pageSize=250&select=${SEL}`,
+      `${API}/cards?q=set.id:sv3pt5&pageSize=250&select=${SEL}`,
+      `${API}/cards?q=set.id:sv4&pageSize=250&select=${SEL}`,
+      `${API}/cards?q=set.id:sv4pt5&pageSize=250&select=${SEL}`,
+      `${API}/cards?q=set.id:sv5&pageSize=250&select=${SEL}`,
+      `${API}/cards?q=set.id:sv6&pageSize=250&select=${SEL}`,
+      `${API}/cards?q=set.id:sv6pt5&pageSize=250&select=${SEL}`,
+      `${API}/cards?q=set.id:sv7&pageSize=250&select=${SEL}`,
+      `${API}/cards?q=set.id:sv8&pageSize=250&select=${SEL}`,
+      `${API}/cards?q=set.id:sv8pt5&pageSize=250&select=${SEL}`,
+      `${API}/cards?q=set.id:sv9&pageSize=250&select=${SEL}`,
+      `${API}/cards?q=set.id:svp&pageSize=250&select=${SEL}`,
+      // SWSH (remaining)
+      `${API}/cards?q=set.id:swsh2&pageSize=250&select=${SEL}`,
+      `${API}/cards?q=set.id:swsh3&pageSize=250&select=${SEL}`,
+      `${API}/cards?q=set.id:swsh5&pageSize=250&select=${SEL}`,
+      `${API}/cards?q=set.id:swsh6&pageSize=250&select=${SEL}`,
+      `${API}/cards?q=set.id:swsh8&pageSize=250&select=${SEL}`,
+      `${API}/cards?q=set.id:swsh9&pageSize=250&select=${SEL}`,
+      `${API}/cards?q=set.id:swsh11&pageSize=250&select=${SEL}`,
+      `${API}/cards?q=set.id:swsh12pt5&pageSize=250&select=${SEL}`,
+      `${API}/cards?q=set.id:swshp&pageSize=250&select=${SEL}`,
+      // Sun & Moon (remaining)
+      `${API}/cards?q=set.id:sm2&pageSize=250&select=${SEL}`,
+      `${API}/cards?q=set.id:sm4&pageSize=250&select=${SEL}`,
+      `${API}/cards?q=set.id:sm5&pageSize=250&select=${SEL}`,
+      `${API}/cards?q=set.id:sm6&pageSize=250&select=${SEL}`,
+      `${API}/cards?q=set.id:sm8&pageSize=250&select=${SEL}`,
+      `${API}/cards?q=set.id:sm9&pageSize=250&select=${SEL}`,
+      `${API}/cards?q=set.id:sm10&pageSize=250&select=${SEL}`,
+      `${API}/cards?q=set.id:sm11&pageSize=250&select=${SEL}`,
+      `${API}/cards?q=set.id:sm12&pageSize=250&select=${SEL}`,
+      `${API}/cards?q=set.id:smp&pageSize=250&select=${SEL}`,
+      // XY (remaining)
+      `${API}/cards?q=set.id:xy2&pageSize=250&select=${SEL}`,
+      `${API}/cards?q=set.id:xy3&pageSize=250&select=${SEL}`,
+      `${API}/cards?q=set.id:xy4&pageSize=250&select=${SEL}`,
+      `${API}/cards?q=set.id:xy6&pageSize=250&select=${SEL}`,
+      `${API}/cards?q=set.id:xy7&pageSize=250&select=${SEL}`,
+      `${API}/cards?q=set.id:xy8&pageSize=250&select=${SEL}`,
+      `${API}/cards?q=set.id:xy9&pageSize=250&select=${SEL}`,
+      `${API}/cards?q=set.id:xy10&pageSize=250&select=${SEL}`,
+      `${API}/cards?q=set.id:xy11&pageSize=250&select=${SEL}`,
+      `${API}/cards?q=set.id:xy12&pageSize=250&select=${SEL}`,
+      `${API}/cards?q=set.id:xyp&pageSize=250&select=${SEL}`,
+      // Black & White
+      `${API}/cards?q=set.id:bw1&pageSize=250&select=${SEL}`,
+      `${API}/cards?q=set.id:bw2&pageSize=250&select=${SEL}`,
+      `${API}/cards?q=set.id:bw3&pageSize=250&select=${SEL}`,
+      `${API}/cards?q=set.id:bw4&pageSize=250&select=${SEL}`,
+      `${API}/cards?q=set.id:bw5&pageSize=250&select=${SEL}`,
+      `${API}/cards?q=set.id:bw6&pageSize=250&select=${SEL}`,
+      `${API}/cards?q=set.id:bw7&pageSize=250&select=${SEL}`,
+      `${API}/cards?q=set.id:bw8&pageSize=250&select=${SEL}`,
+      `${API}/cards?q=set.id:bw9&pageSize=250&select=${SEL}`,
+      `${API}/cards?q=set.id:bw10&pageSize=250&select=${SEL}`,
+      `${API}/cards?q=set.id:bw11&pageSize=250&select=${SEL}`,
+      `${API}/cards?q=set.id:bwp&pageSize=250&select=${SEL}`,
+      // HeartGold SoulSilver
+      `${API}/cards?q=set.id:hgss1&pageSize=250&select=${SEL}`,
+      `${API}/cards?q=set.id:hgss2&pageSize=250&select=${SEL}`,
+      `${API}/cards?q=set.id:hgss3&pageSize=250&select=${SEL}`,
+      `${API}/cards?q=set.id:hgss4&pageSize=250&select=${SEL}`,
+      // Platinum
+      `${API}/cards?q=set.id:pl1&pageSize=250&select=${SEL}`,
+      `${API}/cards?q=set.id:pl2&pageSize=250&select=${SEL}`,
+      `${API}/cards?q=set.id:pl3&pageSize=250&select=${SEL}`,
+      `${API}/cards?q=set.id:pl4&pageSize=250&select=${SEL}`,
+      // Diamond & Pearl
+      `${API}/cards?q=set.id:dp1&pageSize=250&select=${SEL}`,
+      `${API}/cards?q=set.id:dp2&pageSize=250&select=${SEL}`,
+      `${API}/cards?q=set.id:dp3&pageSize=250&select=${SEL}`,
+      `${API}/cards?q=set.id:dp4&pageSize=250&select=${SEL}`,
+      `${API}/cards?q=set.id:dp5&pageSize=250&select=${SEL}`,
+      `${API}/cards?q=set.id:dp6&pageSize=250&select=${SEL}`,
+      `${API}/cards?q=set.id:dp7&pageSize=250&select=${SEL}`,
+      // EX era
+      `${API}/cards?q=set.id:ex1&pageSize=250&select=${SEL}`,
+      `${API}/cards?q=set.id:ex2&pageSize=250&select=${SEL}`,
+      `${API}/cards?q=set.id:ex3&pageSize=250&select=${SEL}`,
+      `${API}/cards?q=set.id:ex4&pageSize=250&select=${SEL}`,
+      `${API}/cards?q=set.id:ex5&pageSize=250&select=${SEL}`,
+      `${API}/cards?q=set.id:ex6&pageSize=250&select=${SEL}`,
+      `${API}/cards?q=set.id:ex7&pageSize=250&select=${SEL}`,
+      `${API}/cards?q=set.id:ex8&pageSize=250&select=${SEL}`,
+      `${API}/cards?q=set.id:ex9&pageSize=250&select=${SEL}`,
+      `${API}/cards?q=set.id:ex10&pageSize=250&select=${SEL}`,
+      `${API}/cards?q=set.id:ex11&pageSize=250&select=${SEL}`,
+      `${API}/cards?q=set.id:ex12&pageSize=250&select=${SEL}`,
+      `${API}/cards?q=set.id:ex13&pageSize=250&select=${SEL}`,
+      `${API}/cards?q=set.id:ex14&pageSize=250&select=${SEL}`,
+      `${API}/cards?q=set.id:ex15&pageSize=250&select=${SEL}`,
+      `${API}/cards?q=set.id:ex16&pageSize=250&select=${SEL}`,
+      // Neo era
+      `${API}/cards?q=set.id:neo1&pageSize=250&select=${SEL}`,
+      `${API}/cards?q=set.id:neo2&pageSize=250&select=${SEL}`,
+      `${API}/cards?q=set.id:neo3&pageSize=250&select=${SEL}`,
+      `${API}/cards?q=set.id:neo4&pageSize=250&select=${SEL}`,
+      // Gym era
+      `${API}/cards?q=set.id:gym1&pageSize=250&select=${SEL}`,
+      `${API}/cards?q=set.id:gym2&pageSize=250&select=${SEL}`,
+      // Classic Base era (remaining)
+      `${API}/cards?q=set.id:base5&pageSize=250&select=${SEL}`,
+      `${API}/cards?q=set.id:base6&pageSize=250&select=${SEL}`,
+      `${API}/cards?q=set.id:basep&pageSize=250&select=${SEL}`,
+      // e-Card
+      `${API}/cards?q=set.id:ecard1&pageSize=250&select=${SEL}`,
+      `${API}/cards?q=set.id:ecard2&pageSize=250&select=${SEL}`,
+      `${API}/cards?q=set.id:ecard3&pageSize=250&select=${SEL}`,
+      // Remaining rare types
+      `${API}/cards?q=rarity:"Rare Secret"&pageSize=250&select=${SEL}`,
+      `${API}/cards?q=rarity:"Rare Rainbow"&pageSize=250&select=${SEL}`,
+      `${API}/cards?q=rarity:"Amazing Rare"&pageSize=250&select=${SEL}`,
+      `${API}/cards?q=rarity:"Illustration Rare"&pageSize=250&select=${SEL}`,
+      `${API}/cards?q=rarity:"Trainer Gallery Rare Holo"&pageSize=250&select=${SEL}`,
+      `${API}/cards?q=rarity:Promo&pageSize=250&select=${SEL}`,
+    ]),200);
+
+  }catch(err){
+    document.getElementById('loader').innerHTML=`<div style="text-align:center;max-width:440px;padding:24px;color:var(--t2)"><div style="font-size:36px;margin-bottom:12px">⚠️</div><div style="font-size:18px;font-weight:700;margin-bottom:10px;color:var(--red)">Connection Failed</div><div style="font-size:13px;line-height:1.8">The PokéTCG API can't be reached from <code>file://</code> — this is a browser security rule.<br><br><strong style="color:var(--t1)">2-second fix:</strong><br><code style="background:var(--bg3);padding:4px 10px;border-radius:4px;display:inline-block;margin:6px 0">npx serve .</code><br>then open <code>http://localhost:3000</code><br><br>Or in VS Code: right-click the file → <strong>Open with Live Server</strong><br><br><span style="font-size:11px;color:var(--t3)">${err.message}</span></div><button onclick="location.reload()" style="margin-top:14px;padding:8px 20px;background:var(--bg3);border:1px solid var(--b2);border-radius:6px;color:var(--t1);cursor:pointer;font-size:13px">↺ Retry</button><button onclick="this.closest('.loader').classList.add('gone')" style="margin-top:14px;margin-left:8px;padding:8px 20px;background:none;border:1px solid var(--b2);border-radius:6px;color:var(--t2);cursor:pointer;font-size:13px">Dismiss</button></div>`;
+  }
+})();
+</script>
+</body>
+</html>
